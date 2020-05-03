@@ -1,0 +1,44 @@
+import os
+import random
+
+import discord
+from dotenv import load_dotenv
+from discord.ext import commands
+from sql import addPlayer
+
+load_dotenv()
+TOKEN = os.getenv('DISCORD_TOKEN')
+GUILD = os.getenv('DISCORD_GUILD')
+
+bot = commands.Bot(command_prefix='!')
+client = discord.Client
+
+@bot.event
+async def on_ready():
+    print(f'{bot.user.name} has connected to Discord!')
+
+@bot.command(name='register')
+async def register(ctx, name):
+    error, errorName = addPlayer(name, ctx.author.id)
+    if error == -1:
+        await ctx.send(f'Player "{name}" already exists')
+        return
+    elif error == -2:
+        await ctx.send(f'You are already registered to player "{errorName[0]}"')
+        return
+    await ctx.send(f'Player added: {name}')
+
+@bot.command(name='round')
+async def round(ctx, round):
+    print(round)
+    channel = client.get_channel(705926326367813703)
+    await channel.send(f'Entering round {round}')
+
+
+
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.errors.CheckFailure):
+        await ctx.send('You do not have the correct role for this command.')
+
+bot.run(TOKEN)
