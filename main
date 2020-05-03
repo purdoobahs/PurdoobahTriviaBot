@@ -31,7 +31,7 @@ async def register(ctx, name):
 @bot.command(name='round')
 async def round(ctx, round):
     print(round)
-    channel = client.get_channel(705926326367813703)
+    channel = bot.get_channel(705926326367813703)
     await channel.send(f'Entering round {round}')
 
 
