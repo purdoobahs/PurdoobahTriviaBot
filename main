@@ -11,7 +11,6 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 GUILD = os.getenv('DISCORD_GUILD')
 
 bot = commands.Bot(command_prefix='!')
-client = discord.Client
 
 @bot.event
 async def on_ready():
@@ -20,17 +19,16 @@ async def on_ready():
 @bot.command(name='register')
 async def register(ctx, name):
     error, errorName = addPlayer(name, ctx.author.id)
-    if error == -1:
-        await ctx.send(f'Player "{name}" already exists')
-        return
-    elif error == -2:
+    if error == -2:
         await ctx.send(f'You are already registered to player "{errorName[0]}"')
+        return
+    elif error == -1:
+        await ctx.send(f'Player "{name}" already exists')
         return
     await ctx.send(f'Player added: {name}')
 
 @bot.command(name='round')
 async def round(ctx, round):
-    print(round)
     channel = bot.get_channel(705926326367813703)
     await channel.send(f'Entering round {round}')
 
