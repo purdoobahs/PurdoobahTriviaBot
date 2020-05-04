@@ -4,7 +4,8 @@ import random
 import discord
 from dotenv import load_dotenv
 from discord.ext import commands
-from sql import addPlayer
+from sql import addPlayer, addAnswer,findPlayer, initialize
+from fuzzywuzzy import fuzz
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -12,31 +13,140 @@ GUILD = os.getenv('DISCORD_GUILD')
 
 bot = commands.Bot(command_prefix='!')
 
+globalRound = 0
+globalQuestionNO = 0
+globalCorrectAnswer = 0
+globalQuestion = 0
+globalDate = 0
+globalCorrectAnswer = 0
+globalSubmission = 0;
+TRIVIA_CHANNEL = 705926326367813703
+
+##################
+### BOT EVENTS ###
+##################
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
 
+####################
+### BOT COMMANDS ###
+####################
+@bot.command(name='resetTrivia')
+@commands.has_role('Trivia Master')
+async def resetTrivia(ctx):
+    initialize()
+    print('SQL Data reset')
+    return
+
 @bot.command(name='register')
 async def register(ctx, name):
-    error, errorName = addPlayer(name, ctx.author.id)
-    if error == -2:
-        await ctx.send(f'You are already registered to player "{errorName[0]}"')
-        return
-    elif error == -1:
+    error, errorName = await addPlayer(name, ctx)
+    if error == -1:
         await ctx.send(f'Player "{name}" already exists')
-        return
-    await ctx.send(f'Player added: {name}')
+    elif error == -2:
+        await ctx.send(f'You are already registered to player "{errorName[0]}"')
+    else:
+        await ctx.send(f'Player added: "{name}"')
 
 @bot.command(name='round')
+@commands.has_role('Trivia Master')
 async def round(ctx, round):
-    channel = bot.get_channel(705926326367813703)
-    await channel.send(f'Entering round {round}')
+    global globalRound
+    channel = bot.get_channel(TRIVIA_CHANNEL)
+    globalRound = round
+    await channel.send(f'Entering round {globalRound}')
 
+@bot.command(name='question')
+@commands.has_role('Trivia Master')
+async def question(ctx,questionNO, *args):
+    global globalQuestionNO
+    global globalQuestion
+    globalQuestion = " ".join(args[:])
+    globalQuestionNO = questionNO
 
+@bot.command(name='answer')
+async def answer(ctx, points:int, *args):
+    if(globalSubmission == 0):
+        await ctx.send(f'Submissions are not currently open!')
+        return
+    error = checkPointAvailable(ctx, points)
+    answer = " ".join(args[:])
+    name = findPlayer(ctx.author.id)
+    correct = checkAnswer(globalCorrectAnswer, answer)
+    addAnswer(globalDate, globalRound, globalQuestionNO, name, answer, points, correct)
+    await ctx.send(f'Submitted "{answer}" for {points} points for Round {globalRound}, Question {globalQuestionNO}')
 
+@bot.command(name='startGame')
+@commands.has_role('Trivia Master')
+async def startGame(ctx, date):
+    global globalDate
+    channel = bot.get_channel(TRIVIA_CHANNEL)
+    globalDate = date
+    await channel.send(f'The game named "{globalDate}" will be starting shortly!')
+
+@bot.command(name='correctAnswer')
+@commands.has_role('Trivia Master')
+async def correctAnswer(ctx, *args):
+    global globalCorrectAnswer
+    globalCorrectAnswer = " ".join(args[:])
+
+@bot.command(name='open')
+@commands.has_role('Trivia Master')
+async def open(ctx):
+    global globalSubmission
+    channel = bot.get_channel(TRIVIA_CHANNEL)
+    if(globalSubmission == 1):
+        await channel.send(f'You must close the previous question before opening a new one')
+        return
+    globalSubmission = 1
+    await channel.send(f'Submissions for Round {globalRound}, Question {globalQuestionNO} are now open!')
+    await channel.send(f'Question {globalQuestionNO}: {globalQuestion}')
+    await channel.send(f'Please enter your answer using !answer POINTS ANSWER')
+
+@bot.command(name='close')
+@commands.has_role('Trivia Master')
+async def close(ctx):
+    global globalSubmission
+    channel = bot.get_channel(TRIVIA_CHANNEL)
+    if(globalSubmission == 0):
+        await channel.send(f'You must open a question before closing a question')
+        return
+    globalSubmission = 0
+    await channel.send(f'Submissions for Round {globalRound}, Question {globalQuestionNO} are now closed!')
+######################
+### ERROR HANDLING ###
+######################
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.errors.CheckFailure):
         await ctx.send('You do not have the correct role for this command.')
+
+#################
+### FUNCTIONS ###
+#################
+def finalCheck(message):
+    if(checkAnswer(message.content, 'yes')):
+        return 1
+    else:
+        return 0
+
+def checkAnswer(attempt, correct):
+    correctRatio = fuzz.token_set_ratio(attempt, correct)
+    if(correctRatio > 85):
+        return 1
+    else:
+        return 0
+
+def checkPointAvailable(ctx, points):
+    name = findPlayer(ctx.author.id)
+    print(globalRound)
+    if((globalRound < 4) and (globalRound > 0)):
+        print('In first if')
+        if(points != 2 or points != 4 or points != 6):
+            print('In second if')
+            #ctx.send(f'Inelligible point value, please use 2, 4, or 6 points.')
+            return 0
+    print('post ifs')
 
 bot.run(TOKEN)
