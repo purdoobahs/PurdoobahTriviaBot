@@ -102,7 +102,7 @@ def addSpecial(name1, round1, numCorrect1, points1, args):
 
 def getResponses(round1, question1, date1):
     conn, c = connectDB()
-    c.execute("""SELECT name, answer, correct FROM data WHERE round=? AND question=? AND date=?""", (round1, question1, date1,))
+    c.execute("""SELECT name, answer, correct, points FROM data WHERE round=? AND question=? AND date=?""", (round1, question1, date1,))
     return c.fetchall()
 
 def getSpecialResponses(round1):

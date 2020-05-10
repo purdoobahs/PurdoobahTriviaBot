@@ -18,12 +18,13 @@ client = discord.Client
 globalRound = 1
 globalQuestionNO = 1
 globalCorrectAnswer = 0
-globalQuestion = 0
-globalDate = 0
+globalQuestion = None
+globalDate = 'realtest'
 globalCorrectAnswer = 0
 globalSubmission = 1
 TRIVIA_CHANNEL = 705926326367813703   ##BOT TESTING CHANNEL
 #TRIVIA_CHANNEL = 706638758102958101   ##REAL TRIVIA CHANNEL
+BASKETUSERID = 126790493588815873
 
 ##################
 ### BOT EVENTS ###
@@ -36,7 +37,7 @@ async def on_ready():
 ### BOT COMMANDS ###
 ####################
 @bot.command(name='resetTrivia')
-@commands.has_role('Trivia Master')
+@commands.has_any_role('Trivia Master', BASKETUSERID)
 async def resetTrivia(ctx):
     initialize()
     print('SQL Data reset')
@@ -64,7 +65,7 @@ async def enroll(ctx):
     conn.close()
 
 @bot.command(name='round')
-@commands.has_role('Trivia Master')
+@commands.has_any_role('Trivia Master', BASKETUSERID)
 async def round(ctx, round):
     global globalRound
     channel = bot.get_channel(TRIVIA_CHANNEL)
@@ -72,17 +73,24 @@ async def round(ctx, round):
     await channel.send(f'Entering round {globalRound}')
 
 @bot.command(name='question')
-@commands.has_role('Trivia Master')
+@commands.has_any_role('Trivia Master', BASKETUSERID)
 async def question(ctx,questionNO, *args):
     global globalQuestionNO
     global globalQuestion
+    if(len(args) == 0):
+        await ctx.send(f'Game not opened, please input question')
+        return
     globalQuestion = " ".join(args[:])
     globalQuestionNO = questionNO
+    await ctx.send(f'Question submitted')
 
 @bot.command(name='halftime')
-@commands.has_role('Trivia Master')
+@commands.has_any_role('Trivia Master', BASKETUSERID)
 async def halftime(ctx, *args):
     global globalRound, globalQuestionNO, globalSubmission, globalCorrectAnswer
+    if(len(args) == 0):
+        await ctx.send(f'Game not opened, please input correct answer')
+        return
     globalRound = 'halftime'
     globalQuestionNO = 1
     globalSubmission = 1
@@ -93,9 +101,12 @@ async def halftime(ctx, *args):
     await channel.send(f'Please enter your answer using !answer 1 ANSWER')
 
 @bot.command(name='final')
-@commands.has_role('Trivia Master')
+@commands.has_any_role('Trivia Master', BASKETUSERID)
 async def final(ctx, *args):
     global globalRound, globalQuestionNO, globalSubmission, globalCorrectAnswer
+    if(len(args) == 0):
+        await ctx.send(f'Game not opened, please input correct answer')
+        return
     globalRound = 'final'
     globalQuestionNO = 1
     globalSubmission = 1
@@ -108,19 +119,19 @@ async def final(ctx, *args):
 @bot.command(name='answer')
 async def answer(ctx, points:int, *args):
     name = findPlayer(ctx.author.id)
+    if (globalSubmission == 0):
+        await ctx.send(f'Submissions are not currently open!')
+        return
+    if(not checkEnroll(ctx)):
+        await ctx.send(f'Please enroll for the game by using !enroll before answering')
+        return
     if(globalRound == 'halftime'):
-        if(globalSubmission == 0):
-            await ctx.send(f'Submissions are not currently open!')
-            return
         points1 = checkHalftime(globalCorrectAnswer, args)
         addAnswer(globalDate, globalRound, globalQuestionNO, name, 'answer', points1 * 3, 1)
         addSpecial(name, globalRound, points1, points, args)
         await ctx.send(f'Submitted halftime answer')
         return
     elif globalRound == 'final':
-        if (globalSubmission == 0):
-            await ctx.send(f'Submissions are not currently open!')
-            return
         correct = checkFinal(globalCorrectAnswer, args)
         addAnswer(globalDate, globalRound, globalQuestionNO, name, 'answer', points, correct)
         addSpecial(name, globalRound, correct, points, args)
@@ -128,9 +139,6 @@ async def answer(ctx, points:int, *args):
         return
     else:
         answer = " ".join(args[:])
-        if(globalSubmission == 0):
-            await ctx.send(f'Submissions are not currently open!')
-            return
         error = await checkPointAvailable(ctx, points,name)
         if error:
             return
@@ -139,7 +147,7 @@ async def answer(ctx, points:int, *args):
         await ctx.send(f'Submitted "{answer}" for {points} points for Round {globalRound}, Question {globalQuestionNO}')
 
 @bot.command(name='startGame')
-@commands.has_role('Trivia Master')
+@commands.has_any_role('Trivia Master', BASKETUSERID)
 async def startGame(ctx, date):
     global globalDate
     conn, c = connectDB()
@@ -159,9 +167,17 @@ async def startGame(ctx, date):
     conn.close()
 
 @bot.command(name='open')
-@commands.has_role('Trivia Master')
+@commands.has_any_role('Trivia Master', BASKETUSERID)
 async def open(ctx, *args):
-    if(globalRound == 0):
+    global globalSubmission, globalCorrectAnswer
+    channel = bot.get_channel(TRIVIA_CHANNEL)
+    if(globalSubmission == 1):
+        await channel.send(f'You must close the previous question before opening a new one')
+        return
+    elif(globalQuestion == None):
+        await ctx.send(f'Please submit question before opening round')
+        return
+    elif(globalRound == 0):
         await ctx.send(f'Round must not be 0')
         return
     elif(globalDate == 0):
@@ -173,11 +189,6 @@ async def open(ctx, *args):
     elif(len(args) == 0):
         await ctx.send(f'Game not opened, please input correct answer')
         return
-    global globalSubmission, globalCorrectAnswer
-    channel = bot.get_channel(TRIVIA_CHANNEL)
-    if(globalSubmission == 1):
-        await channel.send(f'You must close the previous question before opening a new one')
-        return
     globalSubmission = 1
     globalCorrectAnswer = " ".join(args[:])
     await channel.send(f'Submissions for Round {globalRound}, Question {globalQuestionNO} are now open!')
@@ -185,7 +196,7 @@ async def open(ctx, *args):
     await channel.send(f'Please enter your answer using !answer POINTS ANSWER')
 
 @bot.command(name='printResponses')
-@commands.has_role('Trivia Master')
+@commands.has_any_role('Trivia Master', 'Bots', BASKETUSERID)
 async def printResponses(ctx):
     if(globalSubmission):
         await ctx.send(f'Please close submissions before submitting responses')
@@ -215,9 +226,9 @@ async def printResponses(ctx):
             userID = findUserID(x[0])
             user = bot.get_user(userID)
             if(x[2] == 0):
-                await user.send(f'Your answer of {x[1]} was incorrect. The correct answer was {globalCorrectAnswer}. If you would like your answer reviewed, please type !review')
+                await user.send(f'Your answer of {x[1]} for {x[3]} points was incorrect. The correct answer was {globalCorrectAnswer}. If you would like your answer reviewed, please type !review')
             else:
-                await user.send(f'Your answer of {x[1]} was correct.')
+                await user.send(f'Your answer of {x[1]} for {x[3]} points was correct.')
         print(list)
     return
 
@@ -243,7 +254,7 @@ async def review(ctx):
     return
 
 @bot.command(name='correct')
-@commands.has_role('Trivia Master')
+@commands.has_any_role('Trivia Master', BASKETUSERID)
 async def correct(ctx, name1, numCorrect1:int):
     userID = findUserID(name1)
     conn, c = connectDB()
@@ -251,6 +262,7 @@ async def correct(ctx, name1, numCorrect1:int):
         print('pre execute')
         points1 = numCorrect1 * 3
         c.execute("""UPDATE data SET correct=?, points=? WHERE name=? AND date=? AND round=? AND question=?""",(1,points1,name1,globalDate,globalRound,globalQuestionNO,))
+        c.execute("""UPDATE specialAnswers SET numCorrect=? WHERE name=? AND round=?""",(numCorrect1, name1, globalRound,))
         print('bost execute')
         user = bot.get_user(userID)
         print('post getUser')
@@ -274,12 +286,13 @@ async def correct(ctx, name1, numCorrect1:int):
         conn.close()
 
 @bot.command(name='incorrect')
-@commands.has_role('Trivia Master')
+@commands.has_any_role('Trivia Master', BASKETUSERID)
 async def incorrect(ctx, name1, numCorrect1:int):
     userID = findUserID(name1)
     conn, c = connectDB()
     if(globalRound == 'halftime'):
         c.execute("""UPDATE data SET correct=?, points=? WHERE name=? AND date=? AND round=? AND question=?""",(1,numCorrect1*3,name1,globalDate,globalRound,globalQuestionNO))
+        c.execute("""UPDATE specialAnswers SET numCorrect=? WHERE name=? AND round=?""",(numCorrect1, name1, globalRound,))
         user = bot.get_user(userID)
         await user.send(f'Your answer has been reviewed and you have recieved {numCorrect1 * 3} points.')
         print(f'{name1} has been marked as incorrect')
@@ -297,21 +310,94 @@ async def incorrect(ctx, name1, numCorrect1:int):
     conn.close()
 
 @bot.command(name='close')
-@commands.has_role('Trivia Master')
+@commands.has_any_role('Trivia Master', BASKETUSERID)
 async def close(ctx):
-    global globalSubmission
+    global globalSubmission, globalQuestion
     channel = bot.get_channel(TRIVIA_CHANNEL)
+    print(globalSubmission)
     if(globalSubmission == 0):
         await channel.send(f'You must open a question before closing a question')
         return
+    print(globalSubmission)
     globalSubmission = 0
-    await channel.send(f'Submissions for Round {globalRound}, Question {globalQuestionNO} are now closed!')
+    globalQuestion = None
+    await printResponses(ctx)
+    await channel.send(f'**Submissions for Round {globalRound}, Question {globalQuestionNO} are now closed!**')
 
 @bot.command(name='printTest')
 async def printTest(ctx):
     conn, c = connectDB()
     c.execute("""SELECT * FROM data""")
     print(c.fetchall())
+
+@bot.command(name='printScores')
+@commands.has_any_role('Trivia Master', 'Bots', BASKETUSERID)
+async def printScores(ctx):
+    conn, c = connectDB()
+    c.execute("""SELECT name FROM players WHERE online=?""",(1,))
+    nameList = c.fetchall()
+    for name1 in nameList:
+        tempScore = 0
+        c.execute("""SELECT round, points, correct FROM data WHERE date=? AND name=?""",(globalDate, name1[0],))
+        scoreList = c.fetchall()
+        for dataList in scoreList:
+            if dataList[0] == 'final':
+                if dataList[2]:
+                    tempScore += dataList[1]
+                else:
+                    tempScore -= dataList[1]
+            else:
+                if dataList[2]:
+                    tempScore += dataList[1]
+        c.execute("""UPDATE players SET gameScore=? WHERE name=?""",(tempScore, name1[0],))
+    conn.commit()
+    c.execute("""SELECT name, gameScore FROM players WHERE online=?""",(1,))
+    scoreList = c.fetchall()
+    scoreList.sort(key=takeSecond, reverse = True)
+    channel = bot.get_channel(TRIVIA_CHANNEL)
+    await channel.send(f'**Scores for {globalDate}**')
+    place=1
+    tempScore = 1000
+    for x in scoreList:
+        if(tempScore == x[1]):
+            await channel.send(f'{place}: {x[0]}, {x[1]} Points')
+        else:
+            await channel.send(f'{place}: {x[0]}, {x[1]} Points')
+            place += 1
+        tempScore = x[1]
+    conn.close()
+
+@bot.command(name='season')
+async def season(ctx):
+    conn,c = connectDB()
+    c.execute("""SELECT name, seasonScore FROM players WHERE online=?""",(1,))
+    scoreList = c.fetchall()
+    scoreList.sort(key=takeSecond, reverse = True)
+    channel = bot.get_channel(TRIVIA_CHANNEL)
+    await channel.send(f'**Current season standings**')
+    place=1
+    tempScore = 1000
+    for x in scoreList:
+        if(tempScore == x[1]):
+            await channel.send(f'{place}: {x[0]}, {x[1]} Points')
+        else:
+            await channel.send(f'{place}: {x[0]}, {x[1]} Points')
+            place += 1
+        tempScore = x[1]
+    conn.close()
+
+@bot.command(name='endGame')
+@commands.has_any_role('Trivia Master', BASKETUSERID)
+async def endGame(ctx):
+    conn,c = connectDB()
+    c.execute("""SELECT name, gameScore, seasonScore FROM players""")
+    list = c.fetchall()
+    for x in list:
+        c.execute("""UPDATE players SET gameScore=?, seasonScore=? WHERE name=?""",(0,x[1]+x[2], x[0]))
+    await ctx.send(f'Game Has been ended, updating scores!')
+    conn.commit()
+    conn.close()
+
 
 ######################
 ### ERROR HANDLING ###
@@ -378,5 +464,16 @@ async def checkPointAvailable(ctx, points,name):
         else:
             await ctx.send(f'Inelligible point value, please use 5, 7, or 9 points.')
             return 1
+
+def checkEnroll(ctx):
+    conn,c = connectDB()
+    c.execute("""SELECT online FROM players WHERE userID = ?""",(ctx.author.id,))
+    if c.fetchone():
+        return 1
+    else:
+        return 0
+
+def takeSecond(elem):
+    return elem[1]
 
 bot.run(TOKEN)
