@@ -49,7 +49,7 @@ async def addPlayer(incominguser, ctx):
     if(len(list) != 0):
         return -1,list[0]
     c.execute("INSERT INTO players VALUES (?,?,?,?,?)", (incominguser, ctx.author.id,0, 0, 0))
-    await ctx.send(f'Player {incominguser} added!')
+    await ctx.send(f'**Player {incominguser} added!**')
     conn.commit()
     conn.close()
 
