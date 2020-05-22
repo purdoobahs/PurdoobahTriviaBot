@@ -23,8 +23,8 @@ globalDate = None
 globalCorrectAnswer = 0
 globalSubmission = 0
 globalNumEntries = 0
-TRIVIA_CHANNEL = 705926326367813703   ##BOT TESTING CHANNEL
-#TRIVIA_CHANNEL = 706638758102958101   ##REAL TRIVIA CHANNEL
+#TRIVIA_CHANNEL = 705926326367813703   ##BOT TESTING CHANNEL
+TRIVIA_CHANNEL = 706638758102958101   ##REAL TRIVIA CHANNEL
 BASKETUSERID = 126790493588815873
 
 ##################
@@ -369,15 +369,15 @@ async def printScores(ctx):
     scoreList = c.fetchall()
     scoreList.sort(key=takeSecond, reverse = True)
     channel = bot.get_channel(TRIVIA_CHANNEL)
-    await channel.send(f'**Scores for {globalDate}**')
+    string = f'**Scores for {globalDate}**\n'
     place=0
     tempScore = 1000
     for x in scoreList:
         if(tempScore == x[1]):
-            await channel.send(f'{place}: {x[0]}, {x[1]} Points')
+            string += f'{place}: {x[0]}, {x[1]} Points\n'
         else:
             place += 1
-            await channel.send(f'{place}: {x[0]}, {x[1]} Points')
+            string += f'{place}: {x[0]}, {x[1]} Points\n'
         tempScore = x[1]
     conn.close()
 
@@ -388,16 +388,17 @@ async def season(ctx):
     scoreList = c.fetchall()
     scoreList.sort(key=takeSecond, reverse = True)
     channel = bot.get_channel(TRIVIA_CHANNEL)
-    await channel.send(f'**Current season standings**')
+    string = (f'**Current season standings**\n')
     place=0
     tempScore = 1000
     for x in scoreList:
         if(tempScore == x[1]):
-            await channel.send(f'{place}: {x[0]}, {x[1]} Points')
+            string += (f'{place}: {x[0]}, {x[1]} Points\n')
         else:
             place += 1
-            await channel.send(f'{place}: {x[0]}, {x[1]} Points')
+            string += (f'{place}: {x[0]}, {x[1]} Points\n')
         tempScore = x[1]
+    await channel.send(string)
     conn.close()
 
 @bot.command(name='endGame')
