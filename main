@@ -22,9 +22,8 @@ globalQuestion = None
 globalDate = None
 globalCorrectAnswer = 0
 globalSubmission = 0
-globalNumEntries = 0
-#TRIVIA_CHANNEL = 705926326367813703   ##BOT TESTING CHANNEL
-TRIVIA_CHANNEL = 706638758102958101   ##REAL TRIVIA CHANNEL
+TRIVIA_CHANNEL = 705926326367813703   ##BOT TESTING CHANNEL
+#TRIVIA_CHANNEL = 706638758102958101   ##REAL TRIVIA CHANNEL
 BASKETUSERID = 126790493588815873
 
 ##################
@@ -99,10 +98,10 @@ async def halftime(ctx, *args):
     globalQuestionNO = 1
     globalSubmission = 1
     channel = bot.get_channel(TRIVIA_CHANNEL)
-    globalCorrectAnswer = args
+    globalCorrectAnswer = seperateValues(args)
     await channel.send(f'**Submissions for halftime are now open!\n'
                         f'Question: {globalQuestion}\n'
-                        f'Please enter your answer using !answer 1 ANSWER**')
+                        f'Please enter your answer using !answer ANSWER1, ANSWER2, ANSWER3, ANSWER4**')
 
 @bot.command(name='final')
 @commands.has_role("Trivia Master")
@@ -115,14 +114,13 @@ async def final(ctx, *args):
     globalQuestionNO = 1
     globalSubmission = 1
     channel = bot.get_channel(TRIVIA_CHANNEL)
-    globalCorrectAnswer = args
+    globalCorrectAnswer = seperateValues(args)
     await channel.send(f'**Submissions for final trivia are now open!\n'
     f'Question: {globalQuestion}\n'
-    f'Please enter your answer using !answer POINTS ANSWER**')
+    f'Please enter your answer using !answer POINTS ANSWER1, ANSWER2, ANSWER3, ANSWER5**')
 
 @bot.command(name='answer')
-async def answer(ctx, points:int, *args):
-    global globalNumEntries
+async def answer(ctx, *args):
     name = findPlayer(ctx.author.id)
     print('in answer')
     if (globalSubmission == 0):
@@ -132,34 +130,35 @@ async def answer(ctx, points:int, *args):
         await ctx.send(f'**Please enroll for the game by using !enroll before answering**')
         return
     if(globalRound == 'halftime'):
-        points1 = checkHalftime(globalCorrectAnswer, args)
+        answer = seperateValues(args[1:])
+        points1 = checkHalftime(globalCorrectAnswer, answer)
         addAnswer(globalDate, globalRound, globalQuestionNO, name, 'answer', points1 * 3, 1)
-        addSpecial(name, globalRound, points1, points, args)
-        globalNumEntries += 1
-        print(f'({globalNumEntries}) - {name} submitted')
+        addSpecial(name, globalRound, points1, 1, answer)
+        print(f'{name} submitted')
         await ctx.send(f'**Submitted halftime answer**')
         return
     elif globalRound == 'final':
+        points = int(args[0])
         test1 = await checkFinalPoints(ctx, points, name)
         if(test1):
             await ctx.send(f'Inelligible point value, please enter an appropriate score')
             return
-        correct = checkFinal(globalCorrectAnswer, args)
+        answer = seperateValues(args[1:])
+        correct = checkFinal(globalCorrectAnswer, answer)
         addAnswer(globalDate, globalRound, globalQuestionNO, name, 'answer', points, correct)
-        addSpecial(name, globalRound, correct, points, args)
-        globalNumEntries += 1
-        print(f'({globalNumEntries}) - {name} submitted')
+        addSpecial(name, globalRound, correct, points, answer)
+        print(f'{name} submitted')
         await ctx.send(f'**Submitted final trivia answer**')
         return
     else:
-        answer = " ".join(args[:])
+        points = int(args[0])
+        answer = " ".join(args[1:])
         error = await checkPointAvailable(ctx, points,name)
         if error:
             return
         correct = checkAnswer(globalCorrectAnswer, answer)
         addAnswer(globalDate, globalRound, globalQuestionNO, name, answer, points, correct)
-        globalNumEntries == 1
-        print(f'({globalNumEntries}) - {name} submitted')
+        print(f'{name} submitted')
         await ctx.send(f'**Submitted "{answer}" for {points} points for Round {globalRound}, Question {globalQuestionNO}**')
 
 @bot.command(name='startGame')
@@ -444,7 +443,6 @@ def checkAnswer(correct, attempt):
             return 1
     return 0
 
-
 def checkHalftime(correct, attempt):
     numCorrect = 0
     for x in correct:
@@ -500,6 +498,16 @@ def checkEnroll(ctx):
         return 1
     else:
         return 0
+
+def seperateValues(list):
+    index=0
+    finalList = []
+    newList = " ".join(list[:])
+    newList1 = newList.split(",")
+    for x in newList1:
+        finalList.append(x.strip())
+        index += 1
+    return finalList
 
 def takeSecond(elem):
     return elem[1]
