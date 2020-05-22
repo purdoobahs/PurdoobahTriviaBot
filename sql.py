@@ -123,6 +123,6 @@ def getSpecialResponse(round1, userData):
     return c.fetchone()
 
 def connectDB():
-    conn = sqlite3.connect('trivia.db')
+    conn = sqlite3.connect('testTrivia.db')
     c = conn.cursor()
     return conn,c

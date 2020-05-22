@@ -22,8 +22,9 @@ globalQuestion = None
 globalDate = None
 globalCorrectAnswer = 0
 globalSubmission = 0
-#TRIVIA_CHANNEL = 705926326367813703   ##BOT TESTING CHANNEL
-TRIVIA_CHANNEL = 706638758102958101   ##REAL TRIVIA CHANNEL
+globalNumEntries = 0
+TRIVIA_CHANNEL = 705926326367813703   ##BOT TESTING CHANNEL
+#TRIVIA_CHANNEL = 706638758102958101   ##REAL TRIVIA CHANNEL
 BASKETUSERID = 126790493588815873
 
 ##################
@@ -45,7 +46,10 @@ async def resetTrivia(ctx):
 
 @bot.command(name='register')
 async def register(ctx):
-    error, errorName = await addPlayer(ctx.author.nick, ctx)
+    if(ctx.author.nick == None):
+        error, errorName = await addPlayer(ctx.author.name, ctx)
+    else:
+        error, errorName = await addPlayer(ctx.author.nick, ctx)
     if error == -1:
         await ctx.send(f'**Player "{ctx.author.nick}" already exists**')
     elif error == -2:
@@ -96,9 +100,9 @@ async def halftime(ctx, *args):
     globalSubmission = 1
     channel = bot.get_channel(TRIVIA_CHANNEL)
     globalCorrectAnswer = args
-    await channel.send(f'**Submissions for halftime are now open**!')
-    await channel.send(f'**Question: {globalQuestion}**')
-    await channel.send(f'**Please enter your answer using !answer 1 ANSWER**')
+    await channel.send(f'**Submissions for halftime are now open!\n'
+                        f'Question: {globalQuestion}\n'
+                        f'Please enter your answer using !answer 1 ANSWER**')
 
 @bot.command(name='final')
 @commands.has_role("Trivia Master")
@@ -112,13 +116,15 @@ async def final(ctx, *args):
     globalSubmission = 1
     channel = bot.get_channel(TRIVIA_CHANNEL)
     globalCorrectAnswer = args
-    await channel.send(f'**Submissions for final trivia are now open!**')
-    await channel.send(f'**Question: {globalQuestion}**')
-    await channel.send(f'**Please enter your answer using !answer POINTS ANSWER**')
+    await channel.send(f'**Submissions for final trivia are now open!\n'
+    f'Question: {globalQuestion}\n'
+    f'Please enter your answer using !answer POINTS ANSWER**')
 
 @bot.command(name='answer')
 async def answer(ctx, points:int, *args):
+    global globalNumEntries
     name = findPlayer(ctx.author.id)
+    print('in answer')
     if (globalSubmission == 0):
         await ctx.send(f'**Submissions are not currently open!**')
         return
@@ -129,12 +135,20 @@ async def answer(ctx, points:int, *args):
         points1 = checkHalftime(globalCorrectAnswer, args)
         addAnswer(globalDate, globalRound, globalQuestionNO, name, 'answer', points1 * 3, 1)
         addSpecial(name, globalRound, points1, points, args)
+        globalNumEntries += 1
+        print(f'({globalNumEntries}) - {name} submitted')
         await ctx.send(f'**Submitted halftime answer**')
         return
     elif globalRound == 'final':
+        test1 = await checkFinalPoints(ctx, points, name)
+        if(test1):
+            await ctx.send(f'Inelligible point value, please enter an appropriate score')
+            return
         correct = checkFinal(globalCorrectAnswer, args)
         addAnswer(globalDate, globalRound, globalQuestionNO, name, 'answer', points, correct)
         addSpecial(name, globalRound, correct, points, args)
+        globalNumEntries += 1
+        print(f'({globalNumEntries}) - {name} submitted')
         await ctx.send(f'**Submitted final trivia answer**')
         return
     else:
@@ -144,6 +158,8 @@ async def answer(ctx, points:int, *args):
             return
         correct = checkAnswer(globalCorrectAnswer, answer)
         addAnswer(globalDate, globalRound, globalQuestionNO, name, answer, points, correct)
+        globalNumEntries == 1
+        print(f'({globalNumEntries}) - {name} submitted')
         await ctx.send(f'**Submitted "{answer}" for {points} points for Round {globalRound}, Question {globalQuestionNO}**')
 
 @bot.command(name='startGame')
@@ -160,16 +176,16 @@ async def startGame(ctx, date):
     c.execute("""UPDATE players SET online=?""",(0,))
     channel = bot.get_channel(TRIVIA_CHANNEL)
     globalDate = date
-    await channel.send(f'**The game named "{globalDate}" will be starting shortly!**')
-    await channel.send(f'**Please register using !register if you have not registered before**')
-    await channel.send(f'**Please enroll for this game by using !enroll**')
+    await channel.send(f'**The game named "{globalDate}" will be starting shortly!\n'
+    f'Please register using !register if you have not registered before\n'
+    f'Please enroll for this game by using !enroll**')
     conn.commit()
     conn.close()
 
 @bot.command(name='open')
 @commands.has_role("Trivia Master")
 async def open(ctx, *args):
-    global globalSubmission, globalCorrectAnswer
+    global globalSubmission, globalCorrectAnswer, globalNumEntries
     channel = bot.get_channel(TRIVIA_CHANNEL)
     if(globalSubmission == 1):
         await channel.send(f'**You must close the previous question before opening a new one**')
@@ -190,10 +206,11 @@ async def open(ctx, *args):
         await ctx.send(f'**Game not opened, please input correct answer**')
         return
     globalSubmission = 1
+    globalNumEntries = 0
     globalCorrectAnswer = " ".join(args[:])
-    await channel.send(f'**Submissions for Round {globalRound}, Question {globalQuestionNO} are now open!**')
-    await channel.send(f'**Question {globalQuestionNO}: {globalQuestion}**')
-    await channel.send(f'**Please enter your answer using !answer POINTS ANSWER**')
+    await channel.send(f'**Submissions for Round {globalRound}, Question {globalQuestionNO} are now open!\n'
+    f'Question {globalQuestionNO}: {globalQuestion}\n'
+    f'Please enter your answer using !answer POINTS ANSWER**')
 
 @bot.command(name='printResponses')
 @commands.has_any_role('Trivia Master', 'Bots')
@@ -206,8 +223,8 @@ async def printResponses(ctx):
         for x in list:
             userID = findUserID(x[0])
             user = bot.get_user(userID)
-            await user.send(f'**The correct answers for halftime were {globalCorrectAnswer[0]}, {globalCorrectAnswer[1]}, {globalCorrectAnswer[2]}, {globalCorrectAnswer[3]}**')
-            await user.send(f'**Your answer of {x[2]}, {x[3]}, {x[4]}, {x[5]} gave you {x[1]  * 3} points. If you would like your answer reviewed, please type !review**')
+            await user.send(f'**The correct answers for halftime were {globalCorrectAnswer[0]}, {globalCorrectAnswer[1]}, {globalCorrectAnswer[2]}, {globalCorrectAnswer[3]}\n'
+            f'Your answer of {x[2]}, {x[3]}, {x[4]}, {x[5]} gave you {x[1]  * 3} points. If you would like your answer reviewed, please type !review**')
         print(list)
     elif(globalRound == 'final'):
         list = getSpecialResponses(globalRound)
@@ -255,7 +272,8 @@ async def review(ctx):
 
 @bot.command(name='correct')
 @commands.has_role("Trivia Master")
-async def correct(ctx, name1, numCorrect1:int):
+async def correct(ctx, numCorrect1:int, *args):
+    name1 = " ".join(args[:])
     userID = findUserID(name1)
     conn, c = connectDB()
     if(globalRound == 'halftime'):
@@ -284,7 +302,8 @@ async def correct(ctx, name1, numCorrect1:int):
 
 @bot.command(name='incorrect')
 @commands.has_role("Trivia Master")
-async def incorrect(ctx, name1, numCorrect1:int):
+async def incorrect(ctx, numCorrect1:int, *args):
+    name1 = " ".join(args[:])
     userID = findUserID(name1)
     conn, c = connectDB()
     if(globalRound == 'halftime'):
@@ -311,11 +330,9 @@ async def incorrect(ctx, name1, numCorrect1:int):
 async def close(ctx):
     global globalSubmission, globalQuestion
     channel = bot.get_channel(TRIVIA_CHANNEL)
-    print(globalSubmission)
     if(globalSubmission == 0):
         await channel.send(f'**You must open a question before closing a question**')
         return
-    print(globalSubmission)
     globalSubmission = 0
     globalQuestion = None
     await printResponses(ctx)
@@ -353,14 +370,14 @@ async def printScores(ctx):
     scoreList.sort(key=takeSecond, reverse = True)
     channel = bot.get_channel(TRIVIA_CHANNEL)
     await channel.send(f'**Scores for {globalDate}**')
-    place=1
+    place=0
     tempScore = 1000
     for x in scoreList:
         if(tempScore == x[1]):
-            await channel.send(f'**{place}: {x[0]}, {x[1]} Points**')
+            await channel.send(f'{place}: {x[0]}, {x[1]} Points')
         else:
-            await channel.send(f'**{place}: {x[0]}, {x[1]} Points**')
             place += 1
+            await channel.send(f'{place}: {x[0]}, {x[1]} Points')
         tempScore = x[1]
     conn.close()
 
@@ -372,14 +389,14 @@ async def season(ctx):
     scoreList.sort(key=takeSecond, reverse = True)
     channel = bot.get_channel(TRIVIA_CHANNEL)
     await channel.send(f'**Current season standings**')
-    place=1
+    place=0
     tempScore = 1000
     for x in scoreList:
         if(tempScore == x[1]):
             await channel.send(f'{place}: {x[0]}, {x[1]} Points')
         else:
-            await channel.send(f'{place}: {x[0]}, {x[1]} Points')
             place += 1
+            await channel.send(f'{place}: {x[0]}, {x[1]} Points')
         tempScore = x[1]
     conn.close()
 
@@ -422,9 +439,10 @@ def checkAnswer(correct, attempt):
     correctList = [correct, p.number_to_words(correct)]
     for x in correctList:
         correctRatio = fuzz.token_set_ratio(attempt, x)
-        if(correctRatio >= 75):
+        if(correctRatio >= 83):
             return 1
     return 0
+
 
 def checkHalftime(correct, attempt):
     numCorrect = 0
@@ -437,7 +455,7 @@ def checkHalftime(correct, attempt):
 
 def checkFinal(correct, attempt):
     numCorrect = 0
-    for x in range(0,4):
+    for x in range(4):
         numCorrect += checkAnswer(correct[x], attempt[x])
     if numCorrect == 4:
         return 1
@@ -461,6 +479,18 @@ async def checkPointAvailable(ctx, points,name):
         else:
             await ctx.send(f'**Inelligible point value, please use 5, 7, or 9 points.**')
             return 1
+
+async def checkFinalPoints(ctx, points, name1):
+    conn,c = connectDB()
+    c.execute("""SELECT gameScore FROM players WHERE name=?""",(name1,))
+    maxPoints = c.fetchone()
+    print(maxPoints, points)
+    if(points < 0):
+        return 1
+    elif(points > maxPoints[0]):
+        return 1
+    else:
+        return 0
 
 def checkEnroll(ctx):
     conn,c = connectDB()
